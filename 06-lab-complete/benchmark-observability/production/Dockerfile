@@ -29,6 +29,9 @@ ENV PATH=/home/agent/.local/bin:$PATH
 ENV PYTHONPATH=/app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+# Sửa lỗi "No module named 'uvicorn'": useradd -d /app làm HOME=/app nên Python tìm package ở
+# /app/.local, trong khi package được copy vào /home/agent/.local → chỉ rõ user base.
+ENV PYTHONUSERBASE=/home/agent/.local
 
 EXPOSE 8000
 
