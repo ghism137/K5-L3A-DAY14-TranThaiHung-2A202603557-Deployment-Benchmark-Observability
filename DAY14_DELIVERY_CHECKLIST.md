@@ -1,8 +1,8 @@
 #  Delivery Checklist — Day 14 Lab Submission
 
-> **Student Name:** _________________________  
-> **Student ID:** _________________________  
-> **Date:** _________________________
+> **Student Name: Trần Thái Hưng**  
+> **Student ID:2A202603557**    
+> **Date: 25/11/2026**
 
 ---
 
@@ -181,18 +181,20 @@ your-repo/
 
 ##  Pre-Submission Checklist
 
-- [ ] Repository is public (or instructor has access)
-- [ ] `MISSION_ANSWERS.md` completed with all exercises
-- [ ] `DEPLOYMENT.md` has working public URL
-- [ ] All source code in `app/` directory
-- [ ] `README.md` has clear setup instructions
-- [ ] No `.env` file committed (only `.env.example`)
-- [ ] No hardcoded secrets in code
-- [ ] Public URL is accessible and working
-- [ ] Screenshots included in `screenshots/` folder
-- [ ] Repository has clear commit history
-- [ ] `python check_production_ready.py` → `PASS 12/12`
-- [ ] `BENCHMARK_REPORT.md` điền đủ, có `reports/`, `benchmark-results/` và screenshot Part 7
+> Trạng thái kiểm tra ngày 25/11/2026. Chỉ đánh `[x]` mục đã kiểm chứng bằng lệnh thật.
+
+- [x] Repository is public (or instructor has access): `gh repo view` → `"visibility":"PUBLIC"`
+- [ ] `MISSION_ANSWERS.md` completed with all exercises: Part 1–6 đã có output thật; **còn** các ô `[ĐIỀN]` tự viết (2.1 Q3–Q4, câu hỏi 4.1/4.3, luồng JWT 4.2, giải thích 5.5, cột "tự kiểm tra" của AI log) và viết lại các đoạn 💡 GỢI Ý
+- [x] `DEPLOYMENT.md` has working public URL: https://agent-production-5dafbd72.up.railway.app
+- [x] All source code in `app/` directory: `06-lab-complete/app/` (main, config, auth, rate_limiter, cost_guard, redis_client)
+- [x] `README.md` has clear setup instructions: `06-lab-complete/README.md` (mục *Chạy local*, *Chấm bài*, *Deploy*)
+- [x] No `.env` file committed (only `.env.example`): `.env` nằm trong `.gitignore`, `git ls-files` không có `.env`
+- [x] No hardcoded secrets in code: script chấm ✅ "Không hard-code secret trong code"; `AGENT_API_KEY` chỉ nằm trong Railway Variables
+- [x] Public URL is accessible and working: `/health` 200, `/ready` 200, `/ask` 401 khi không key / 200 khi có key
+- [x] Screenshots included in `screenshots/` folder: đủ 7 ảnh: `dashboard.png`, `running.png`, `test.png` (CP6) + `grafana-dashboard.png`, `jaeger-slow-trace.png`, `jaeger-error-trace.png`, `prometheus-alert-firing.png` (Part 7, 2 alert firing)
+- [ ] Repository has clear commit history: **chưa commit** bài làm
+- [x] `python check_production_ready.py` → `PASS 12/12`: chạy đầy đủ (có Docker, trong container Linux), `12/12 tiêu chí · 42/42 checks` (kèm `--public-url`)
+- [ ] `BENCHMARK_REPORT.md` điền đủ, có `reports/`, `benchmark-results/` và screenshot Part 7: mục 1–6 + Exercise 7.4 đã điền bằng số liệu thật; `reports/` (10 JSON) và `benchmark-results/` (CSV scale_1/scale_3) đã copy ra gốc repo theo SUBMISSION.md; ảnh đủ; **còn** viết lại các đoạn 💡 GỢI Ý bằng lời của mình
 
 ---
 
@@ -200,30 +202,40 @@ your-repo/
 
 Before submitting, verify your deployment:
 
+> Lệnh đã chỉnh theo README (*Lưu ý khi làm bài* số 8): lệnh gốc gọi `GET /ask` nên trả **405**, không phải 401 (đã thử: `curl $BASE/ask` → `HTTP 405`). Vì vậy dùng `POST` kèm `Content-Type: application/json`.
+
 ```bash
+BASE=https://agent-production-5dafbd72.up.railway.app
+AGENT_API_KEY=<key trên Railway>
+
 # 1. Health check
-curl https://your-app.railway.app/health
+curl $BASE/health
+# Thực tế: {"status":"ok","version":"1.0.0","environment":"production","uptime_seconds":201.9}  -> HTTP 200
 
 # 2. Authentication required
-curl https://your-app.railway.app/ask
-# Should return 401
+curl -X POST $BASE/ask -H "Content-Type: application/json" -d '{"user_id":"test","question":"Hello"}'
+# Thực tế: {"detail":"Missing or invalid API key. Send header: X-API-Key: <key>"}  -> HTTP 401
 
 # 3. With API key works
-curl -H "X-API-Key: YOUR_KEY" https://your-app.railway.app/ask \
-  -X POST -d '{"user_id":"test","question":"Hello"}'
-# Should return 200
+curl -X POST $BASE/ask -H "X-API-Key: $AGENT_API_KEY" -H "Content-Type: application/json" \
+  -d '{"user_id":"test","question":"Hello"}'
+# Thực tế: {"question":"Hello","answer":"Agent đang hoạt động tốt! (mock response) Hỏi thêm câu hỏi đi nhé.","usage":{...}}  -> HTTP 200
 
 # 4. Rate limiting
-for i in {1..15}; do 
-  curl -H "X-API-Key: YOUR_KEY" https://your-app.railway.app/ask \
-    -X POST -d '{"user_id":"test","question":"test"}'; 
+for i in $(seq 1 15); do
+  curl -s -o /dev/null -w "%{http_code} " -X POST $BASE/ask -H "X-API-Key: $AGENT_API_KEY" \
+    -H "Content-Type: application/json" -d '{"user_id":"test","question":"test"}'
 done
-# Should eventually return 429
+# Thực tế: 200 200 200 200 200 200 200 200 200 429 429 429 429 429 429
+# (9 lần 200 + 1 request ở bước 3 = giới hạn 10 request/phút)
 
 # 5. Part 7 — eval quality gate (agent v2 đang chạy ở local)
 cd 06-lab-complete/benchmark-observability/develop
 python eval/run_eval.py --min-accuracy 1.0
 # Should print: Quality gate ... ✅ PASS
+# Thực tế (2026-11-25, sau khi sửa KNOWLEDGE_BASE, thêm --baseline reports/eval_v2.json --out reports/eval_v2_fixed.json):
+#   Accuracy : 100.0%  (23/23) · Câu bị regression : 0
+#   Quality gate (accuracy ≥ 100%, không regression): ✅ PASS   (exit code 0)
 ```
 
 ---
@@ -233,7 +245,7 @@ python eval/run_eval.py --min-accuracy 1.0
 **Submit your GitHub repository URL:**
 
 ```
-https://github.com/your-username/day14-agent-deployment
+https://github.com/ghism137/K5-L3A-DAY14-TranThaiHung-2A202603557-Deployment-Benchmark-Observability
 ```
 
 ---
